@@ -6,11 +6,11 @@ use crate::key::Key;
 use crate::set::SetStorage;
 
 type Iter<'a, T> = iter::Chain<
-    iter::Map<<<T as Key>::SetStorage as SetStorage<T>>::Iter<'a>, fn(T) -> Option<T>>,
+    iter::Map<<<T as Key<'a, ()>>::SetStorage as SetStorage<'a, T>>::Iter, fn(T) -> Option<T>>,
     option::IntoIter<Option<T>>,
 >;
-type IntoIter<T> = iter::Chain<
-    iter::Map<<<T as Key>::SetStorage as SetStorage<T>>::IntoIter, fn(T) -> Option<T>>,
+type IntoIter<'a, T> = iter::Chain<
+    iter::Map<<<T as Key<'a, ()>>::SetStorage as SetStorage<'a, T>>::IntoIter, fn(T) -> Option<T>>,
     option::IntoIter<Option<T>>,
 >;
 
@@ -46,17 +46,17 @@ type IntoIter<T> = iter::Chain<
 /// assert!(a.values().copied().eq([2, 1]));
 /// assert!(a.keys().eq([Key::First(Some(Part::A)), Key::First(None)]));
 /// ```
-pub struct OptionSetStorage<T>
+pub struct OptionSetStorage<'a, T>
 where
-    T: Key,
+    T: Key<'a, ()>,
 {
     some: T::SetStorage,
     none: bool,
 }
 
-impl<T> Clone for OptionSetStorage<T>
+impl<'a, T> Clone for OptionSetStorage<'a, T>
 where
-    T: Key,
+    T: Key<'a, ()>,
     T::SetStorage: Clone,
 {
     #[inline]
@@ -68,16 +68,16 @@ where
     }
 }
 
-impl<T> Copy for OptionSetStorage<T>
+impl<'a, T> Copy for OptionSetStorage<'a, T>
 where
-    T: Key,
+    T: Key<'a, ()>,
     T::SetStorage: Copy,
 {
 }
 
-impl<T> PartialEq for OptionSetStorage<T>
+impl<'a, T> PartialEq for OptionSetStorage<'a, T>
 where
-    T: Key,
+    T: Key<'a, ()>,
     T::SetStorage: PartialEq,
 {
     #[inline]
@@ -86,19 +86,19 @@ where
     }
 }
 
-impl<T> Eq for OptionSetStorage<T>
+impl<'a, T> Eq for OptionSetStorage<'a, T>
 where
-    T: Key,
+    T: Key<'a, ()>,
     T::SetStorage: Eq,
 {
 }
 
-impl<T> SetStorage<Option<T>> for OptionSetStorage<T>
+impl<'a, T> SetStorage<'a, Option<T>> for OptionSetStorage<'a, T>
 where
-    T: Key,
+    T: Key<'a, ()>,
 {
-    type Iter<'this> = Iter<'this, T> where T: 'this;
-    type IntoIter = IntoIter<T>;
+    type Iter = Iter<'a, T>;
+    type IntoIter = IntoIter<'a, T>;
 
     #[inline]
     fn empty() -> Self {
@@ -161,7 +161,7 @@ where
     }
 
     #[inline]
-    fn iter(&self) -> Self::Iter<'_> {
+    fn iter(&'a self) -> Self::Iter {
         let map: fn(_) -> _ = Some;
         self.some
             .iter()

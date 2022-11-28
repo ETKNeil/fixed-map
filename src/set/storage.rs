@@ -19,11 +19,9 @@ pub use self::option::OptionSetStorage;
 /// # Type Arguments
 ///
 /// - `T` is the key being stored.
-pub trait SetStorage<T>: Sized {
+pub trait SetStorage<'a, T>: Sized {
     /// Immutable iterator over storage.
-    type Iter<'this>: Iterator<Item = T>
-    where
-        Self: 'this;
+    type Iter: Iterator<Item = T>;
 
     /// Owning iterator over the storage.
     type IntoIter: Iterator<Item = T>;
@@ -55,7 +53,7 @@ pub trait SetStorage<T>: Sized {
     fn clear(&mut self);
 
     /// This is the storage abstraction for [`Set::iter`][crate::Set::iter].
-    fn iter(&self) -> Self::Iter<'_>;
+    fn iter(&'a self) -> Self::Iter;
 
     /// This is the storage abstraction for [`Set::into_iter`][crate::Set::into_iter].
     fn into_iter(self) -> Self::IntoIter;

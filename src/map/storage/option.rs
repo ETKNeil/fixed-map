@@ -8,31 +8,33 @@ use crate::option_bucket::{NoneBucket, OptionBucket, SomeBucket};
 
 type Iter<'a, K, V> = iter::Chain<
     iter::Map<
-        <<K as Key>::MapStorage<V> as MapStorage<K, V>>::Iter<'a>,
+        <<K as Key<'a, V>>::MapStorage as MapStorage<'a, K, V>>::Iter,
         fn((K, &'a V)) -> (Option<K>, &'a V),
     >,
     iter::Map<option::Iter<'a, V>, fn(&'a V) -> (Option<K>, &'a V)>,
 >;
 type Keys<'a, K, V> = iter::Chain<
-    iter::Map<<<K as Key>::MapStorage<V> as MapStorage<K, V>>::Keys<'a>, fn(K) -> Option<K>>,
+    iter::Map<<<K as Key<'a, V>>::MapStorage as MapStorage<'a, K, V>>::Keys, fn(K) -> Option<K>>,
     option::IntoIter<Option<K>>,
 >;
-type Values<'a, K, V> =
-    iter::Chain<<<K as Key>::MapStorage<V> as MapStorage<K, V>>::Values<'a>, option::Iter<'a, V>>;
+type Values<'a, K, V> = iter::Chain<
+    <<K as Key<'a, V>>::MapStorage as MapStorage<'a, K, V>>::Values,
+    option::Iter<'a, V>,
+>;
 type IterMut<'a, K, V> = iter::Chain<
     iter::Map<
-        <<K as Key>::MapStorage<V> as MapStorage<K, V>>::IterMut<'a>,
+        <<K as Key<'a, V>>::MapStorage as MapStorage<'a, K, V>>::IterMut,
         fn((K, &'a mut V)) -> (Option<K>, &'a mut V),
     >,
     iter::Map<option::IterMut<'a, V>, fn(&'a mut V) -> (Option<K>, &'a mut V)>,
 >;
 type ValuesMut<'a, K, V> = iter::Chain<
-    <<K as Key>::MapStorage<V> as MapStorage<K, V>>::ValuesMut<'a>,
+    <<K as Key<'a, V>>::MapStorage as MapStorage<'a, K, V>>::ValuesMut,
     option::IterMut<'a, V>,
 >;
-type IntoIter<K, V> = iter::Chain<
+type IntoIter<'a, K, V> = iter::Chain<
     iter::Map<
-        <<K as Key>::MapStorage<V> as MapStorage<K, V>>::IntoIter,
+        <<K as Key<'a, V>>::MapStorage as MapStorage<'a, K, V>>::IntoIter,
         fn((K, V)) -> (Option<K>, V),
     >,
     iter::Map<option::IntoIter<V>, fn(V) -> (Option<K>, V)>,
@@ -70,19 +72,19 @@ type IntoIter<K, V> = iter::Chain<
 /// assert!(a.values().copied().eq([2, 1]));
 /// assert!(a.keys().eq([Key::First(Some(Part::A)), Key::First(None)]));
 /// ```
-pub struct OptionMapStorage<K, V>
+pub struct OptionMapStorage<'a, K, V>
 where
-    K: Key,
+    K: Key<'a, V>,
 {
-    some: K::MapStorage<V>,
+    some: K::MapStorage,
     none: Option<V>,
 }
 
-impl<K, V> Clone for OptionMapStorage<K, V>
+impl<'a, K, V> Clone for OptionMapStorage<'a, K, V>
 where
-    K: Key,
+    K: Key<'a, V>,
     V: Clone,
-    K::MapStorage<V>: Clone,
+    K::MapStorage: Clone,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -93,18 +95,18 @@ where
     }
 }
 
-impl<K, V> Copy for OptionMapStorage<K, V>
+impl<'a, K, V> Copy for OptionMapStorage<'a, K, V>
 where
-    K: Key,
+    K: Key<'a, V>,
     V: Copy,
-    K::MapStorage<V>: Copy,
+    K::MapStorage: Copy,
 {
 }
 
-impl<K, V> PartialEq for OptionMapStorage<K, V>
+impl<'a, K, V> PartialEq for OptionMapStorage<'a, K, V>
 where
-    K: Key,
-    K::MapStorage<V>: PartialEq,
+    K: Key<'a, V>,
+    K::MapStorage: PartialEq,
     V: PartialEq,
 {
     #[inline]
@@ -113,33 +115,33 @@ where
     }
 }
 
-impl<K, V> Eq for OptionMapStorage<K, V>
+impl<'a, K, V> Eq for OptionMapStorage<'a, K, V>
 where
-    K: Key,
-    K::MapStorage<V>: Eq,
+    K: Key<'a, V>,
+    K::MapStorage: Eq,
     V: Eq,
 {
 }
 
 pub enum Vacant<'a, K: 'a, V>
 where
-    K: Key,
+    K: Key<'a, V>,
 {
     None(NoneBucket<'a, V>),
-    Some(<K::MapStorage<V> as MapStorage<K, V>>::Vacant<'a>),
+    Some(<K::MapStorage as MapStorage<'a, K, V>>::Vacant),
 }
 
 pub enum Occupied<'a, K: 'a, V>
 where
-    K: Key,
+    K: Key<'a, V>,
 {
     None(SomeBucket<'a, V>),
-    Some(<K::MapStorage<V> as MapStorage<K, V>>::Occupied<'a>),
+    Some(<K::MapStorage as MapStorage<'a, K, V>>::Occupied),
 }
 
 impl<'a, K, V> VacantEntry<'a, Option<K>, V> for Vacant<'a, K, V>
 where
-    K: Key,
+    K: Key<'a, V>,
 {
     #[inline]
     fn key(&self) -> Option<K> {
@@ -160,7 +162,7 @@ where
 
 impl<'a, K, V> OccupiedEntry<'a, Option<K>, V> for Occupied<'a, K, V>
 where
-    K: Key,
+    K: Key<'a, V>,
 {
     #[inline]
     fn key(&self) -> Option<K> {
@@ -211,18 +213,18 @@ where
     }
 }
 
-impl<K, V> MapStorage<Option<K>, V> for OptionMapStorage<K, V>
+impl<'a, K, V: 'a> MapStorage<'a, Option<K>, V> for OptionMapStorage<'a, K, V>
 where
-    K: Key,
+    K: Key<'a, V> + 'a,
 {
-    type Iter<'this> = Iter<'this, K, V> where K: 'this, V: 'this;
-    type Keys<'this> = Keys<'this, K, V> where K: 'this, V: 'this;
-    type Values<'this> = Values<'this, K, V> where K: 'this, V: 'this;
-    type IterMut<'this> = IterMut<'this, K, V> where K: 'this, V: 'this;
-    type ValuesMut<'this> = ValuesMut<'this, K, V> where K: 'this, V: 'this;
-    type IntoIter = IntoIter<K, V>;
-    type Occupied<'this> = Occupied<'this, K, V> where K: 'this, V: 'this;
-    type Vacant<'this> = Vacant<'this, K, V> where K: 'this, V: 'this;
+    type Iter = Iter<'a, K, V>;
+    type Keys = Keys<'a, K, V>;
+    type Values = Values<'a, K, V>;
+    type IterMut = IterMut<'a, K, V>;
+    type ValuesMut = ValuesMut<'a, K, V>;
+    type IntoIter = IntoIter<'a, K, V>;
+    type Occupied = Occupied<'a, K, V>;
+    type Vacant = Vacant<'a, K, V>;
 
     #[inline]
     fn empty() -> Self {
@@ -302,7 +304,7 @@ where
     }
 
     #[inline]
-    fn iter(&self) -> Self::Iter<'_> {
+    fn iter(&'a self) -> Self::Iter {
         let map: fn(_) -> _ = |(k, b)| (Some(k), b);
         let a = self.some.iter().map(map);
         let map: fn(_) -> _ = |v| (None, v);
@@ -311,7 +313,7 @@ where
     }
 
     #[inline]
-    fn keys(&self) -> Self::Keys<'_> {
+    fn keys(&'a self) -> Self::Keys {
         let map: fn(_) -> _ = |k| Some(k);
         self.some
             .keys()
@@ -320,12 +322,12 @@ where
     }
 
     #[inline]
-    fn values(&self) -> Self::Values<'_> {
+    fn values(&'a self) -> Self::Values {
         self.some.values().chain(self.none.iter())
     }
 
     #[inline]
-    fn iter_mut(&mut self) -> Self::IterMut<'_> {
+    fn iter_mut(&'a mut self) -> Self::IterMut {
         let map: fn(_) -> _ = |(k, b)| (Some(k), b);
         let a = self.some.iter_mut().map(map);
         let map: fn(_) -> _ = |v| (None, v);
@@ -334,7 +336,7 @@ where
     }
 
     #[inline]
-    fn values_mut(&mut self) -> Self::ValuesMut<'_> {
+    fn values_mut(&'a mut self) -> Self::ValuesMut {
         self.some.values_mut().chain(self.none.iter_mut())
     }
 
@@ -348,7 +350,7 @@ where
     }
 
     #[inline]
-    fn entry(&mut self, key: Option<K>) -> Entry<'_, Self, Option<K>, V> {
+    fn entry(&'a mut self, key: Option<K>) -> Entry<'a, Self, Option<K>, V> {
         match key {
             Some(key) => match self.some.entry(key) {
                 Entry::Occupied(entry) => Entry::Occupied(Occupied::Some(entry)),

@@ -54,11 +54,11 @@ where
 
 impl<T> Eq for HashbrownSetStorage<T> where T: Eq + Hash {}
 
-impl<T> SetStorage<T> for HashbrownSetStorage<T>
+impl<'a, T> SetStorage<'a, T> for HashbrownSetStorage<T>
 where
-    T: Copy + Eq + Hash,
+    T: Copy + Eq + Hash + 'a,
 {
-    type Iter<'this> = iter::Copied<::hashbrown::hash_set::Iter<'this, T>> where T: 'this;
+    type Iter = iter::Copied<::hashbrown::hash_set::Iter<'a, T>>;
     type IntoIter = ::hashbrown::hash_set::IntoIter<T>;
 
     #[inline]
@@ -107,7 +107,7 @@ where
     }
 
     #[inline]
-    fn iter(&self) -> Self::Iter<'_> {
+    fn iter(&'a self) -> Self::Iter {
         self.inner.iter().copied()
     }
 

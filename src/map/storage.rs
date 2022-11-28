@@ -22,48 +22,30 @@ use crate::map::Entry;
 ///
 /// - `K` is the key being stored.
 /// - `V` is the value being stored.
-pub trait MapStorage<K, V>: Sized {
+pub trait MapStorage<'a, K, V: 'a>: Sized {
     /// Immutable iterator over storage.
-    type Iter<'this>: Iterator<Item = (K, &'this V)>
-    where
-        Self: 'this,
-        V: 'this;
+    type Iter: Iterator<Item = (K, &'a V)> + 'a;
 
     /// Immutable iterator over keys in storage.
-    type Keys<'this>: Iterator<Item = K>
-    where
-        Self: 'this;
+    type Keys: Iterator<Item = K>;
 
     /// Immutable iterator over values in storage.
-    type Values<'this>: Iterator<Item = &'this V>
-    where
-        Self: 'this,
-        V: 'this;
+    type Values: Iterator<Item = &'a V>;
 
     /// Mutable iterator over storage.
-    type IterMut<'this>: Iterator<Item = (K, &'this mut V)>
-    where
-        Self: 'this,
-        V: 'this;
+    type IterMut: Iterator<Item = (K, &'a mut V)>;
 
     /// Mutable iterator over values in storage.
-    type ValuesMut<'this>: Iterator<Item = &'this mut V>
-    where
-        Self: 'this,
-        V: 'this;
+    type ValuesMut: Iterator<Item = &'a mut V>;
 
     /// Consuming iterator.
     type IntoIter: Iterator<Item = (K, V)>;
 
     /// An occupied entry.
-    type Occupied<'this>: OccupiedEntry<'this, K, V>
-    where
-        Self: 'this;
+    type Occupied: OccupiedEntry<'a, K, V>;
 
     /// A vacant entry.
-    type Vacant<'this>: VacantEntry<'this, K, V>
-    where
-        Self: 'this;
+    type Vacant: VacantEntry<'a, K, V>;
 
     /// Construct empty storage.
     fn empty() -> Self;
@@ -98,25 +80,25 @@ pub trait MapStorage<K, V>: Sized {
     fn clear(&mut self);
 
     /// This is the storage abstraction for [`Map::iter`][crate::Map::iter].
-    fn iter(&self) -> Self::Iter<'_>;
+    fn iter(&'a self) -> Self::Iter;
 
     /// This is the storage abstraction for [`Map::keys`][crate::Map::keys].
-    fn keys(&self) -> Self::Keys<'_>;
+    fn keys(&'a self) -> Self::Keys;
 
     /// This is the storage abstraction for [`Map::values`][crate::Map::values].
-    fn values(&self) -> Self::Values<'_>;
+    fn values(&'a self) -> Self::Values;
 
     /// This is the storage abstraction for [`Map::iter_mut`][crate::Map::iter_mut].
-    fn iter_mut(&mut self) -> Self::IterMut<'_>;
+    fn iter_mut(&'a mut self) -> Self::IterMut;
 
     /// This is the storage abstraction for [`Map::values_mut`][crate::Map::values_mut].
-    fn values_mut(&mut self) -> Self::ValuesMut<'_>;
+    fn values_mut(&'a mut self) -> Self::ValuesMut;
 
     /// This is the storage abstraction for [`Map::into_iter`][crate::Map::into_iter].
     fn into_iter(self) -> Self::IntoIter;
 
     /// This is the storage abstraction for [`Map::entry`][crate::Map::entry].
-    fn entry(&mut self, key: K) -> Entry<'_, Self, K, V>;
+    fn entry(&'a mut self, key: K) -> Entry<'a, Self, K, V>;
 }
 
 /// A view into an occupied entry in a [`Map`][crate::Map]. It is part of the

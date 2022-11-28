@@ -308,7 +308,6 @@
     unused_lifetimes,
     unused_macro_rules,
     unused_qualifications,
-    unused_tuple_struct_fields,
     variant_size_differences,
     // Enable pedantic clippy lints
     clippy::pedantic,

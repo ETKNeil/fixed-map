@@ -116,18 +116,21 @@ where
     }
 }
 
-impl<K, V> MapStorage<K, V> for HashbrownMapStorage<K, V>
+impl<'a, K, V: 'a> MapStorage<'a, K, V> for HashbrownMapStorage<K, V>
 where
-    K: Copy + Eq + Hash,
+    K: Copy + Eq + Hash + 'a,
 {
-    type Iter<'this> = iter::Map<::hashbrown::hash_map::Iter<'this, K, V>, fn((&'this K, &'this V)) -> (K, &'this V)> where K: 'this, V: 'this;
-    type Keys<'this> = iter::Copied<::hashbrown::hash_map::Keys<'this, K, V>> where K: 'this, V: 'this;
-    type Values<'this> = ::hashbrown::hash_map::Values<'this, K, V> where K: 'this, V: 'this;
-    type IterMut<'this> = iter::Map<::hashbrown::hash_map::IterMut<'this, K, V>, fn((&'this K, &'this mut V)) -> (K, &'this mut V)> where K: 'this, V: 'this;
-    type ValuesMut<'this> = ::hashbrown::hash_map::ValuesMut<'this, K, V> where K: 'this, V: 'this;
+    type Iter = iter::Map<::hashbrown::hash_map::Iter<'a, K, V>, fn((&'_ K, &'a V)) -> (K, &'a V)>;
+    type Keys = iter::Copied<::hashbrown::hash_map::Keys<'a, K, V>>;
+    type Values = ::hashbrown::hash_map::Values<'a, K, V>;
+    type IterMut = iter::Map<
+        ::hashbrown::hash_map::IterMut<'a, K, V>,
+        fn((&'_ K, &'a mut V)) -> (K, &'a mut V),
+    >;
+    type ValuesMut = ::hashbrown::hash_map::ValuesMut<'a, K, V>;
     type IntoIter = ::hashbrown::hash_map::IntoIter<K, V>;
-    type Occupied<'this> = Occupied<'this, K, V> where K: 'this, V: 'this;
-    type Vacant<'this> = Vacant<'this, K, V> where K: 'this, V: 'this;
+    type Occupied = Occupied<'a, K, V>;
+    type Vacant = Vacant<'a, K, V>;
 
     #[inline]
     fn empty() -> Self {
@@ -185,29 +188,29 @@ where
     }
 
     #[inline]
-    fn iter(&self) -> Self::Iter<'_> {
-        let map: fn(_) -> _ = |(k, v): (&K, &V)| (*k, v);
+    fn iter(&'a self) -> Self::Iter {
+        let map = |(k, v): (&K, &'a V)| (*k, v);
         self.inner.iter().map(map)
     }
 
     #[inline]
-    fn keys(&self) -> Self::Keys<'_> {
+    fn keys(&'a self) -> Self::Keys {
         self.inner.keys().copied()
     }
 
     #[inline]
-    fn values(&self) -> Self::Values<'_> {
+    fn values(&'a self) -> Self::Values {
         self.inner.values()
     }
 
     #[inline]
-    fn iter_mut(&mut self) -> Self::IterMut<'_> {
-        let map: fn(_) -> _ = |(k, v): (&K, &mut V)| (*k, v);
+    fn iter_mut(&'a mut self) -> Self::IterMut {
+        let map = |(k, v): (&K, &'a mut V)| (*k, v);
         self.inner.iter_mut().map(map)
     }
 
     #[inline]
-    fn values_mut(&mut self) -> Self::ValuesMut<'_> {
+    fn values_mut(&'a mut self) -> Self::ValuesMut {
         self.inner.values_mut()
     }
 
@@ -217,7 +220,7 @@ where
     }
 
     #[inline]
-    fn entry(&mut self, key: K) -> Entry<'_, Self, K, V> {
+    fn entry(&'a mut self, key: K) -> Entry<'a, Self, K, V> {
         match self.inner.entry(key) {
             HashMapEntry::Occupied(entry) => Entry::Occupied(entry),
             HashMapEntry::Vacant(entry) => Entry::Vacant(entry),

@@ -12,6 +12,7 @@ use crate::context::Ctxt;
 pub(crate) fn implement(cx: &Ctxt<'_>, en: &DataEnum) -> Result<TokenStream, ()> {
     let ident = &cx.ast.ident;
 
+    let lt = cx.lt;
     let key_t = cx.toks.key_t();
     let map_storage_t = cx.toks.map_storage_t();
     let set_storage_t = cx.toks.set_storage_t();
@@ -85,8 +86,8 @@ pub(crate) fn implement(cx: &Ctxt<'_>, en: &DataEnum) -> Result<TokenStream, ()>
             #set_storage_impl
 
             #[automatically_derived]
-            impl #key_t for #ident {
-                type MapStorage<V> = #map_storage_type_name<V>;
+            impl<#lt, V: #lt> #key_t<#lt, V> for #ident {
+                type MapStorage = #map_storage_type_name<V>;
                 type SetStorage = #set_storage_type_name;
             }
         };
@@ -2031,8 +2032,8 @@ fn map_storage_entry(
     });
 
     output.items.extend(quote! {
-        type Occupied<#lt> = OccupiedEntry<#lt, V> where V: #lt;
-        type Vacant<#lt> = VacantEntry<#lt, V> where V: #lt;
+        type Occupied = OccupiedEntry<#lt, V>;
+        type Vacant = VacantEntry<#lt, V>;
 
         #[inline]
         fn entry(&mut self, key: #ident) -> #entry_enum<'_, Self, #ident, V> {

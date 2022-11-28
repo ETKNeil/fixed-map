@@ -69,7 +69,6 @@ type IntoIter<V> = iter::Chain<
 /// assert!(a.iter().eq([(Key::Bool(true), &1), (Key::Bool(false), &2)]));
 /// assert_eq!(a.iter().rev().collect::<Vec<_>>(), vec![(Key::Bool(false), &2), (Key::Bool(true), &1)]);
 /// ```
-
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct BooleanMapStorage<V> {
     t: Option<V>,
@@ -191,15 +190,15 @@ impl<'a, V> OccupiedEntry<'a, bool, V> for Occupied<'a, V> {
     }
 }
 
-impl<V> MapStorage<bool, V> for BooleanMapStorage<V> {
-    type Iter<'this> = Iter<'this, V> where V: 'this;
-    type Keys<'this> = Keys where V: 'this;
-    type Values<'this> = Values<'this, V> where V: 'this;
-    type IterMut<'this> = IterMut<'this, V> where V: 'this;
-    type ValuesMut<'this> = ValuesMut<'this, V> where V: 'this;
+impl<'a, V: 'a> MapStorage<'a, bool, V> for BooleanMapStorage<V> {
+    type Iter = Iter<'a, V>;
+    type Keys = Keys;
+    type Values = Values<'a, V>;
+    type IterMut = IterMut<'a, V>;
+    type ValuesMut = ValuesMut<'a, V>;
     type IntoIter = IntoIter<V>;
-    type Occupied<'this> = Occupied<'this, V> where V: 'this;
-    type Vacant<'this> = Vacant<'this, V> where V: 'this;
+    type Occupied = Occupied<'a, V>;
+    type Vacant = Vacant<'a, V>;
 
     #[inline]
     fn empty() -> Self {
@@ -288,7 +287,7 @@ impl<V> MapStorage<bool, V> for BooleanMapStorage<V> {
     }
 
     #[inline]
-    fn iter(&self) -> Self::Iter<'_> {
+    fn iter(&'a self) -> Self::Iter {
         let map: fn(_) -> _ = |v| (true, v);
         let a = self.t.iter().map(map);
         let map: fn(_) -> _ = |v| (false, v);
@@ -297,7 +296,7 @@ impl<V> MapStorage<bool, V> for BooleanMapStorage<V> {
     }
 
     #[inline]
-    fn keys(&self) -> Self::Keys<'_> {
+    fn keys(&self) -> Self::Keys {
         Keys {
             bits: if self.t.is_some() { TRUE_BIT } else { 0 }
                 | if self.f.is_some() { FALSE_BIT } else { 0 },
@@ -305,12 +304,12 @@ impl<V> MapStorage<bool, V> for BooleanMapStorage<V> {
     }
 
     #[inline]
-    fn values(&self) -> Self::Values<'_> {
+    fn values(&'a self) -> Self::Values {
         self.t.iter().chain(self.f.iter())
     }
 
     #[inline]
-    fn iter_mut(&mut self) -> Self::IterMut<'_> {
+    fn iter_mut(&'a mut self) -> Self::IterMut {
         let map: fn(_) -> _ = |v| (true, v);
         let a = self.t.iter_mut().map(map);
         let map: fn(_) -> _ = |v| (false, v);
@@ -319,7 +318,7 @@ impl<V> MapStorage<bool, V> for BooleanMapStorage<V> {
     }
 
     #[inline]
-    fn values_mut(&mut self) -> Self::ValuesMut<'_> {
+    fn values_mut(&'a mut self) -> Self::ValuesMut {
         self.t.iter_mut().chain(self.f.iter_mut())
     }
 
@@ -333,7 +332,7 @@ impl<V> MapStorage<bool, V> for BooleanMapStorage<V> {
     }
 
     #[inline]
-    fn entry(&mut self, key: bool) -> Entry<'_, Self, bool, V> {
+    fn entry(&'a mut self, key: bool) -> Entry<'a, Self, bool, V> {
         if key {
             match OptionBucket::new(&mut self.t) {
                 OptionBucket::Some(inner) => Entry::Occupied(Occupied { key, inner }),

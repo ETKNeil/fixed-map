@@ -115,8 +115,8 @@ impl ExactSizeIterator for Iter {
     }
 }
 
-impl SetStorage<bool> for BooleanSetStorage {
-    type Iter<'this> = Iter;
+impl SetStorage<'_, bool> for BooleanSetStorage {
+    type Iter = Iter;
     type IntoIter = Iter;
 
     #[inline]
@@ -173,7 +173,7 @@ impl SetStorage<bool> for BooleanSetStorage {
     }
 
     #[inline]
-    fn iter(&self) -> Self::Iter<'_> {
+    fn iter(&self) -> Self::Iter {
         Iter { bits: self.bits }
     }
 

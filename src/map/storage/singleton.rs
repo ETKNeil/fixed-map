@@ -22,18 +22,18 @@ where
 
 impl<V> Eq for SingletonMapStorage<V> where V: Eq {}
 
-impl<K, V> MapStorage<K, V> for SingletonMapStorage<V>
+impl<'a, K, V: 'a> MapStorage<'a, K, V> for SingletonMapStorage<V>
 where
-    K: Default,
+    K: Default + 'a,
 {
-    type Iter<'this> = ::core::option::IntoIter<(K, &'this V)> where V: 'this;
-    type Keys<'this> = ::core::option::IntoIter<K> where V: 'this;
-    type Values<'this> = ::core::option::Iter<'this, V> where V: 'this;
-    type IterMut<'this> = ::core::option::IntoIter<(K, &'this mut V)> where V: 'this;
-    type ValuesMut<'this> = ::core::option::IterMut<'this, V> where V: 'this;
+    type Iter = ::core::option::IntoIter<(K, &'a V)>;
+    type Keys = ::core::option::IntoIter<K>;
+    type Values = ::core::option::Iter<'a, V>;
+    type IterMut = ::core::option::IntoIter<(K, &'a mut V)>;
+    type ValuesMut = ::core::option::IterMut<'a, V>;
     type IntoIter = ::core::option::IntoIter<(K, V)>;
-    type Occupied<'this> = SomeBucket<'this, V> where V: 'this;
-    type Vacant<'this> = NoneBucket<'this, V> where V: 'this;
+    type Occupied = SomeBucket<'a, V>;
+    type Vacant = NoneBucket<'a, V>;
 
     #[inline]
     fn empty() -> Self {
@@ -95,27 +95,27 @@ where
     }
 
     #[inline]
-    fn iter(&self) -> Self::Iter<'_> {
+    fn iter(&'a self) -> Self::Iter {
         self.inner.as_ref().map(|v| (K::default(), v)).into_iter()
     }
 
     #[inline]
-    fn keys(&self) -> Self::Keys<'_> {
+    fn keys(&'a self) -> Self::Keys {
         Some(K::default()).into_iter()
     }
 
     #[inline]
-    fn values(&self) -> Self::Values<'_> {
+    fn values(&'a self) -> Self::Values {
         self.inner.iter()
     }
 
     #[inline]
-    fn iter_mut(&mut self) -> Self::IterMut<'_> {
+    fn iter_mut(&'a mut self) -> Self::IterMut {
         self.inner.as_mut().map(|v| (K::default(), v)).into_iter()
     }
 
     #[inline]
-    fn values_mut(&mut self) -> Self::ValuesMut<'_> {
+    fn values_mut(&'a mut self) -> Self::ValuesMut {
         self.inner.iter_mut()
     }
 
@@ -125,7 +125,7 @@ where
     }
 
     #[inline]
-    fn entry(&mut self, _key: K) -> Entry<'_, Self, K, V> {
+    fn entry(&'a mut self, _key: K) -> Entry<'a, Self, K, V> {
         match OptionBucket::new(&mut self.inner) {
             OptionBucket::Some(some) => Entry::Occupied(some),
             OptionBucket::None(none) => Entry::Vacant(none),

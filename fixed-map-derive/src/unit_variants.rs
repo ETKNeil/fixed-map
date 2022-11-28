@@ -11,6 +11,7 @@ pub(crate) fn implement(cx: &Ctxt<'_>, opts: &Opts, en: &DataEnum) -> Result<Tok
         &format!("__IMPL_KEY_FOR_{}", cx.ast.ident),
         Span::call_site(),
     );
+    let lt = cx.lt;
 
     let map_storage = format_ident!("__MapStorage");
     let set_storage = format_ident!("__SetStorage");
@@ -46,8 +47,8 @@ pub(crate) fn implement(cx: &Ctxt<'_>, opts: &Opts, en: &DataEnum) -> Result<Tok
             #set_storage_impl
 
             #[automatically_derived]
-            impl #key_t for #ident {
-                type MapStorage<V> = #map_storage<V>;
+            impl<#lt, V: #lt> #key_t<#lt, V> for #ident {
+                type MapStorage = #map_storage<V>;
                 type SetStorage = #set_storage;
             }
         };
@@ -234,27 +235,27 @@ fn impl_map(
         }
 
         #[automatically_derived]
-        impl<V> #map_storage_t<#ident, V> for #map_storage<V> {
-            type Iter<#lt> = #iterator_flat_map<
+        impl<#lt, V: #lt> #map_storage_t<#lt, #ident, V> for #map_storage<V> {
+            type Iter = #iterator_flat_map<
                 #array_into_iter<(#ident, &#lt #option<V>), #count>,
                 #option<(#ident, &#lt V)>,
                 fn((#ident, &#lt #option<V>)) -> #option<(#ident, &#lt V)>
-            > where V: #lt;
-            type Keys<#lt> = #iterator_flatten<#array_into_iter<#option<#ident>, #count>> where V: #lt;
-            type Values<#lt> = #iterator_flatten<#slice_iter<#lt, #option<V>>> where V: #lt;
-            type IterMut<#lt> = #iterator_flat_map<
+            >;
+            type Keys = #iterator_flatten<#array_into_iter<#option<#ident>, #count>>;
+            type Values = #iterator_flatten<#slice_iter<#lt, #option<V>>>;
+            type IterMut = #iterator_flat_map<
                 #array_into_iter<(#ident, &#lt mut #option<V>), #count>,
                 #option<(#ident, &#lt mut V)>,
                 fn((#ident, &#lt mut #option<V>)) -> #option<(#ident, &#lt mut V)>
-            > where V: #lt;
-            type ValuesMut<#lt> = #iterator_flatten<#slice_iter_mut<#lt, #option<V>>> where V: #lt;
+            >;
+            type ValuesMut = #iterator_flatten<#slice_iter_mut<#lt, #option<V>>>;
             type IntoIter = #iterator_flat_map<
                 #array_into_iter<(#ident, #option<V>), #count>,
                 #option<(#ident, V)>,
                 fn((#ident, #option<V>)) -> #option<(#ident, V)>
             >;
-            type Occupied<#lt> = OccupiedEntry<#lt, V> where V: #lt;
-            type Vacant<#lt> = VacantEntry<#lt, V> where V: #lt;
+            type Occupied = OccupiedEntry<#lt, V>;
+            type Vacant = VacantEntry<#lt, V>;
 
             #[inline]
             fn empty() -> Self {
@@ -340,30 +341,30 @@ fn impl_map(
             }
 
             #[inline]
-            fn iter(&self) -> Self::Iter<'_> {
+            fn iter(&#lt self) -> Self::Iter {
                 let [#(#names),*] = &self.data;
                 #iterator_t::flat_map(#into_iterator_t::into_iter([#((#ident::#variants, #names)),*]), |(k, v)| #option::Some((k, #option::as_ref(v)?)))
             }
 
             #[inline]
-            fn keys(&self) -> Self::Keys<'_> {
+            fn keys(&#lt self) -> Self::Keys {
                 let [#(#names),*] = &self.data;
                 #iterator_t::flatten(#into_iterator_t::into_iter([#(if #names.is_some() { Some(#ident::#variants) } else { None }),*]))
             }
 
             #[inline]
-            fn values(&self) -> Self::Values<'_> {
+            fn values(&#lt self) -> Self::Values {
                 #iterator_t::flatten(#into_iterator_t::into_iter(&self.data))
             }
 
             #[inline]
-            fn iter_mut(&mut self) -> Self::IterMut<'_> {
+            fn iter_mut(&#lt mut self) -> Self::IterMut {
                 let [#(#names),*] = &mut self.data;
                 #iterator_t::flat_map(#into_iterator_t::into_iter([#((#ident::#variants, #names)),*]), |(k, v)| #option::Some((k, #option::as_mut(v)?)))
             }
 
             #[inline]
-            fn values_mut(&mut self) -> Self::ValuesMut<'_> {
+            fn values_mut(&#lt mut self) -> Self::ValuesMut {
                 #iterator_t::flatten(#into_iterator_t::into_iter(&mut self.data))
             }
 
@@ -374,7 +375,7 @@ fn impl_map(
             }
 
             #[inline]
-            fn entry(&mut self, key: #ident) -> #entry_enum<'_, Self, #ident, V> {
+            fn entry(&#lt mut self, key: #ident) -> #entry_enum<#lt, Self, #ident, V> {
                 let [#(#names),*] = &mut self.data;
 
                 match key {
@@ -450,7 +451,7 @@ fn impl_bitset(cx: &Ctxt<'_>, en: &DataEnum, set_storage: &Ident) -> Result<Toke
 
         #[automatically_derived]
         impl #set_storage_t<#ident> for #set_storage {
-            type Iter<#lt> = #iterator_flatten<#array_into_iter<#option<#ident>, #count>>;
+            type Iter = #iterator_flatten<#array_into_iter<#option<#ident>, #count>>;
             type IntoIter = #iterator_flatten<#array_into_iter<#option<#ident>, #count>>;
 
             #[inline]
@@ -511,7 +512,7 @@ fn impl_bitset(cx: &Ctxt<'_>, en: &DataEnum, set_storage: &Ident) -> Result<Toke
             }
 
             #[inline]
-            fn iter(&self) -> Self::Iter<'_> {
+            fn iter(&#lt self) -> Self::Iter {
                 #iterator_t::flatten(#into_iterator_t::into_iter([#(if self.data & #numbers != 0 { Some(#ident::#variants) } else { None }),*]))
             }
 
@@ -601,8 +602,8 @@ fn impl_set(
         }
 
         #[automatically_derived]
-        impl #set_storage_t<#ident> for #set_storage {
-            type Iter<#lt> = #iterator_flatten<#array_into_iter<#option<#ident>, #count>>;
+        impl<#lt> #set_storage_t<#lt, #ident> for #set_storage {
+            type Iter = #iterator_flatten<#array_into_iter<#option<#ident>, #count>>;
             type IntoIter = #iterator_flatten<#array_into_iter<#option<#ident>, #count>>;
 
             #[inline]
@@ -669,7 +670,7 @@ fn impl_set(
             }
 
             #[inline]
-            fn iter(&self) -> Self::Iter<'_> {
+            fn iter(&#lt self) -> Self::Iter {
                 let [#(#names),*] = &self.data;
                 #iterator_t::flatten(#into_iterator_t::into_iter([#(if *#names { Some(#ident::#variants) } else { None }),*]))
             }

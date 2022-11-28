@@ -1,34 +1,36 @@
 //! Contains the fixed [`Map`] implementation.
 
 mod entry;
+
 pub use self::entry::Entry;
 
 pub(crate) mod storage;
+
 pub use self::storage::{MapStorage, OccupiedEntry, VacantEntry};
 
 use core::cmp::{Ord, Ordering, PartialOrd};
-use core::fmt;
 use core::hash::{Hash, Hasher};
+use core::marker::PhantomData;
 
 use crate::key::Key;
 
 /// The iterator produced by [`Map::iter`].
-pub type Iter<'a, K, V> = <<K as Key>::MapStorage<V> as MapStorage<K, V>>::Iter<'a>;
+pub type Iter<'a, K, V> = <<K as Key<'a, V>>::MapStorage as MapStorage<'a, K, V>>::Iter;
 
 /// The iterator produced by [`Map::keys`].
-pub type Keys<'a, K, V> = <<K as Key>::MapStorage<V> as MapStorage<K, V>>::Keys<'a>;
+pub type Keys<'a, K, V> = <<K as Key<'a, V>>::MapStorage as MapStorage<'a, K, V>>::Keys;
 
 /// The iterator produced by [`Map::values`].
-pub type Values<'a, K, V> = <<K as Key>::MapStorage<V> as MapStorage<K, V>>::Values<'a>;
+pub type Values<'a, K, V> = <<K as Key<'a, V>>::MapStorage as MapStorage<'a, K, V>>::Values;
 
 /// The iterator produced by [`Map::iter`].
-pub type IterMut<'a, K, V> = <<K as Key>::MapStorage<V> as MapStorage<K, V>>::IterMut<'a>;
+pub type IterMut<'a, K, V> = <<K as Key<'a, V>>::MapStorage as MapStorage<'a, K, V>>::IterMut;
 
 /// The iterator produced by [`Map::values_mut`].
-pub type ValuesMut<'a, K, V> = <<K as Key>::MapStorage<V> as MapStorage<K, V>>::ValuesMut<'a>;
+pub type ValuesMut<'a, K, V> = <<K as Key<'a, V>>::MapStorage as MapStorage<'a, K, V>>::ValuesMut;
 
 /// The iterator produced by [`Map::into_iter`].
-pub type IntoIter<K, V> = <<K as Key>::MapStorage<V> as MapStorage<K, V>>::IntoIter;
+pub type IntoIter<'a, K, V> = <<K as Key<'a, V>>::MapStorage as MapStorage<'a, K, V>>::IntoIter;
 
 /// A fixed map with storage specialized through the [`Key`] trait.
 ///
@@ -107,11 +109,12 @@ pub type IntoIter<K, V> = <<K as Key>::MapStorage<V> as MapStorage<K, V>>::IntoI
 /// assert_eq!(map.values().cloned().collect::<Vec<_>>(), vec![&42u32]);
 /// ```
 #[repr(transparent)]
-pub struct Map<K, V>
+pub struct Map<'a, K, V>
 where
-    K: Key,
+    K: Key<'a, V>,
 {
-    storage: K::MapStorage<V>,
+    storage: K::MapStorage,
+    _lifetime: PhantomData<&'a ()>,
 }
 
 /// A map implementation that uses fixed storage.
@@ -157,9 +160,9 @@ where
 /// assert_eq!(m.get(Key::Composite(Part::A)), Some(&2));
 /// assert_eq!(m.get(Key::Composite(Part::B)), None);
 /// ```
-impl<K, V> Map<K, V>
+impl<'a, K, V> Map<'a, K, V>
 where
-    K: Key,
+    K: Key<'a, V>,
 {
     /// Creates an empty [`Map`].
     ///
@@ -178,9 +181,10 @@ where
     /// ```
     #[inline]
     #[must_use]
-    pub fn new() -> Map<K, V> {
+    pub fn new() -> Self {
         Map {
             storage: K::MapStorage::empty(),
+            _lifetime: PhantomData::default(),
         }
     }
 
@@ -206,7 +210,7 @@ where
     /// assert_eq!(map.iter().collect::<Vec<_>>(), vec![(Key::One, &1), (Key::Two, &2)]);
     /// ```
     #[inline]
-    pub fn iter(&self) -> Iter<'_, K, V> {
+    pub fn iter(&'a self) -> Iter<'a, K, V> {
         self.storage.iter()
     }
 
@@ -255,7 +259,7 @@ where
     /// assert!(map.keys().rev().eq([Key::Second(false), Key::First]));
     /// ```
     #[inline]
-    pub fn keys(&self) -> Keys<'_, K, V> {
+    pub fn keys(&'a self) -> Keys<'a, K, V> {
         self.storage.keys()
     }
 
@@ -302,7 +306,7 @@ where
     /// assert!(map.values().rev().copied().eq([2, 1]));
     /// ```
     #[inline]
-    pub fn values(&self) -> Values<'_, K, V> {
+    pub fn values(&'a self) -> Values<'a, K, V> {
         self.storage.values()
     }
 
@@ -356,7 +360,7 @@ where
     /// assert!(map.iter().eq([(Key::First(true), &2), (Key::Second, &4)]));
     /// ```
     #[inline]
-    pub fn iter_mut(&mut self) -> IterMut<'_, K, V> {
+    pub fn iter_mut(&'a mut self) -> IterMut<'a, K, V> {
         self.storage.iter_mut()
     }
 
@@ -427,7 +431,7 @@ where
     /// assert!(map.values().copied().eq([4, 5]));
     /// ```
     #[inline]
-    pub fn values_mut(&mut self) -> ValuesMut<'_, K, V> {
+    pub fn values_mut(&'a mut self) -> ValuesMut<'a, K, V> {
         self.storage.values_mut()
     }
 
@@ -827,7 +831,7 @@ where
     /// assert_eq!(map.get(Key::Second), Some(&vec![2; 4]));
     /// ```
     #[inline]
-    pub fn entry(&mut self, key: K) -> Entry<'_, K::MapStorage<V>, K, V> {
+    pub fn entry(&'a mut self, key: K) -> Entry<'a, K::MapStorage, K, V> {
         K::MapStorage::entry(&mut self.storage, key)
     }
 }
@@ -858,15 +862,16 @@ where
 /// assert_eq!(b.get(Key::First(true)), Some(&1));
 /// assert_eq!(b.get(Key::Second), Some(&2));
 /// ```
-impl<K, V> Clone for Map<K, V>
+impl<'a, K, V> Clone for Map<'a, K, V>
 where
-    K: Key,
-    K::MapStorage<V>: Clone,
+    K: Key<'a, V>,
+    K::MapStorage: Clone,
 {
     #[inline]
-    fn clone(&self) -> Map<K, V> {
+    fn clone(&self) -> Self {
         Map {
             storage: self.storage.clone(),
+            _lifetime: PhantomData::default(),
         }
     }
 }
@@ -899,10 +904,10 @@ where
 /// assert_eq!(b.get(Key::First), Some(&1));
 /// assert_eq!(b.get(Key::Second), Some(&2));
 /// ```
-impl<K, V> Copy for Map<K, V>
+impl<'a, K, V> Copy for Map<'a, K, V>
 where
-    K: Key,
-    K::MapStorage<V>: Copy,
+    K: Key<'a, V>,
+    K::MapStorage: Copy,
 {
 }
 
@@ -924,9 +929,9 @@ where
 ///
 /// assert_eq!(a, b);
 /// ```
-impl<K, V> Default for Map<K, V>
+impl<'a, K, V> Default for Map<'a, K, V>
 where
-    K: Key,
+    K: Key<'a, V>,
 {
     #[inline]
     fn default() -> Self {
@@ -934,34 +939,38 @@ where
     }
 }
 
-/// The [`Debug`][fmt::Debug] implementation for a [`Map`].
-///
-/// # Examples
-///
-/// ```
-/// use fixed_map::{Key, Map};
-///
-/// #[derive(Debug, Clone, Copy, Key)]
-/// enum Key {
-///     First,
-///     Second,
-/// }
-///
-/// let mut a = Map::new();
-/// a.insert(Key::First, 42);
-///
-/// assert_eq!("{First: 42}", format!("{:?}", a));
-/// ```
-impl<K, V> fmt::Debug for Map<K, V>
-where
-    K: Key + fmt::Debug,
-    V: fmt::Debug,
-{
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_map().entries(self.iter()).finish()
-    }
-}
+// /// The [`Debug`][fmt::Debug] implementation for a [`Map`].
+// ///
+// /// # Examples
+// ///
+// /// ```
+// /// use fixed_map::{Key, Map};
+// ///
+// /// #[derive(Debug, Clone, Copy, Key)]
+// /// enum Key {
+// ///     First,
+// ///     Second,
+// /// }
+// ///
+// /// let mut a = Map::new();
+// /// a.insert(Key::First, 42);
+// ///
+// /// assert_eq!("{First: 42}", format!("{:?}", a));
+// /// ```
+// impl<'a,K, V> fmt::Debug for Map<'a,K, V>
+//     where
+//         K: Key<'a,V> + fmt::Debug,
+//         V: fmt::Debug,
+// {
+//     #[inline]
+//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+//         let mut entries =vec![];
+//         for entry in self.iter(){
+//             entries.push((entry.0,entry.1))
+//         }
+//         f.debug_map().entries(entries).finish()
+//     }
+// }
 
 /// [`PartialEq`] implementation for a [`Map`].
 ///
@@ -1007,10 +1016,10 @@ where
 /// b.insert(Key::Second, 42);
 /// assert_ne!(a, b);
 /// ```
-impl<K, V> PartialEq for Map<K, V>
+impl<'a, K, V> PartialEq for Map<'a, K, V>
 where
-    K: Key,
-    K::MapStorage<V>: PartialEq,
+    K: Key<'a, V>,
+    K::MapStorage: PartialEq,
 {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
@@ -1018,10 +1027,10 @@ where
     }
 }
 
-impl<K, V> Eq for Map<K, V>
+impl<'a, K, V> Eq for Map<'a, K, V>
 where
-    K: Key,
-    K::MapStorage<V>: Eq,
+    K: Key<'a, V>,
+    K::MapStorage: Eq,
 {
 }
 
@@ -1069,10 +1078,10 @@ where
 /// // let mut set = HashSet::new();
 /// // set.insert(a);
 /// ```
-impl<K, V> Hash for Map<K, V>
+impl<'a, K, V> Hash for Map<'a, K, V>
 where
-    K: Key,
-    K::MapStorage<V>: Hash,
+    K: Key<'a, V>,
+    K::MapStorage: Hash,
 {
     #[inline]
     fn hash<H>(&self, state: &mut H)
@@ -1132,10 +1141,10 @@ where
 /// // TODO: support this
 /// // assert!(a < b);
 /// ```
-impl<K, V> PartialOrd for Map<K, V>
+impl<'a, K, V> PartialOrd for Map<'a, K, V>
 where
-    K: Key,
-    K::MapStorage<V>: PartialOrd,
+    K: Key<'a, V>,
+    K::MapStorage: PartialOrd,
 {
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
@@ -1211,10 +1220,10 @@ where
 /// // let mut list = vec![a, b];
 /// // list.sort();
 /// ```
-impl<K, V> Ord for Map<K, V>
+impl<'a, K, V> Ord for Map<'a, K, V>
 where
-    K: Key,
-    K::MapStorage<V>: Ord,
+    K: Key<'a, V>,
+    K::MapStorage: Ord,
 {
     #[inline]
     fn cmp(&self, other: &Self) -> Ordering {
@@ -1225,6 +1234,7 @@ where
     fn max(self, other: Self) -> Self {
         Self {
             storage: self.storage.max(other.storage),
+            _lifetime: PhantomData::default(),
         }
     }
 
@@ -1232,6 +1242,7 @@ where
     fn min(self, other: Self) -> Self {
         Self {
             storage: self.storage.min(other.storage),
+            _lifetime: PhantomData::default(),
         }
     }
 
@@ -1239,13 +1250,14 @@ where
     fn clamp(self, min: Self, max: Self) -> Self {
         Self {
             storage: self.storage.clamp(min.storage, max.storage),
+            _lifetime: PhantomData::default(),
         }
     }
 }
 
-impl<'a, K, V> IntoIterator for &'a Map<K, V>
+impl<'a, K, V: 'a> IntoIterator for &'a Map<'a, K, V>
 where
-    K: Key,
+    K: Key<'a, V>,
 {
     type Item = (K, &'a V);
     type IntoIter = Iter<'a, K, V>;
@@ -1258,9 +1270,9 @@ where
 
 /// [`IntoIterator`] implementation which uses [`Map::iter_mut`]. See its
 /// documentation for more.
-impl<'a, K, V> IntoIterator for &'a mut Map<K, V>
+impl<'a, K, V: 'a> IntoIterator for &'a mut Map<'a, K, V>
 where
-    K: Key,
+    K: Key<'a, V>,
 {
     type Item = (K, &'a mut V);
     type IntoIter = IterMut<'a, K, V>;
@@ -1327,12 +1339,12 @@ where
 /// assert_eq!(it.next(), Some((Key::First(false), 1)));
 /// assert_eq!(it.next(), None);
 /// ```
-impl<K, V> IntoIterator for Map<K, V>
+impl<'a, K, V: 'a> IntoIterator for Map<'a, K, V>
 where
-    K: Key,
+    K: Key<'a, V>,
 {
     type Item = (K, V);
-    type IntoIter = IntoIter<K, V>;
+    type IntoIter = IntoIter<'a, K, V>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -1362,9 +1374,9 @@ where
 ///
 /// assert_eq!(m, n);
 /// ```
-impl<K, V> FromIterator<(K, V)> for Map<K, V>
+impl<'a, K, V> FromIterator<(K, V)> for Map<'a, K, V>
 where
-    K: Key,
+    K: Key<'a, V>,
 {
     #[inline]
     fn from_iter<T>(iter: T) -> Self
@@ -1405,7 +1417,7 @@ where
 #[cfg(feature = "serde")]
 impl<'de, K, V> serde::de::Deserialize<'de> for Map<K, V>
 where
-    K: Key + serde::de::Deserialize<'de>,
+    K: Key<V> + serde::de::Deserialize<'de>,
     V: serde::Deserialize<'de>,
 {
     #[inline]
@@ -1417,10 +1429,10 @@ where
 
         impl<'de, K, V> serde::de::Visitor<'de> for MapVisitor<K, V>
         where
-            K: Key + serde::de::Deserialize<'de>,
+            K: Key<V> + serde::de::Deserialize<'de>,
             V: serde::Deserialize<'de>,
         {
-            type Value = Map<K, V>;
+            type Value = Map<'_, K, V>;
 
             fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
                 formatter.write_str("a map")

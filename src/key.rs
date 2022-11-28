@@ -122,34 +122,34 @@ use crate::set::storage::{BooleanSetStorage, OptionSetStorage, SetStorage, Singl
 /// [`BTreeSet`]: https://doc.rust-lang.org/std/collections/struct.BTreeSet.html
 /// [`Map`]: crate::Map
 /// [`Set`]: crate::Set
-pub trait Key: Copy {
+pub trait Key<'a, V: 'a>: Copy {
     /// The [`Map`] storage implementation to use for the key implementing
     /// this trait.
-    type MapStorage<V>: MapStorage<Self, V>;
+    type MapStorage: MapStorage<'a, Self, V>;
 
     /// The [`Set`] storage implementation to use for the key implementing
     /// this trait.
-    type SetStorage: SetStorage<Self>;
+    type SetStorage: SetStorage<'a, Self>;
 }
 
-impl Key for bool {
-    type MapStorage<V> = BooleanMapStorage<V>;
+impl<'a, V: 'a> Key<'a, V> for bool {
+    type MapStorage = BooleanMapStorage<V>;
     type SetStorage = BooleanSetStorage;
 }
 
-impl<K> Key for Option<K>
+impl<'a, K, V: 'a> Key<'a, V> for Option<K>
 where
-    K: Key,
+    K: Key<'a, V> + Key<'a, ()> + 'a,
 {
-    type MapStorage<V> = OptionMapStorage<K, V>;
-    type SetStorage = OptionSetStorage<K>;
+    type MapStorage = OptionMapStorage<'a, K, V>;
+    type SetStorage = OptionSetStorage<'a, K>;
 }
 
 macro_rules! map_key {
     ($ty:ty) => {
         #[cfg(feature = "hashbrown")]
-        impl Key for $ty {
-            type MapStorage<V> = HashbrownMapStorage<$ty, V>;
+        impl<'a, V: 'a> Key<'a, V> for $ty {
+            type MapStorage = HashbrownMapStorage<$ty, V>;
             type SetStorage = HashbrownSetStorage<$ty>;
         }
     };
@@ -157,8 +157,8 @@ macro_rules! map_key {
 
 macro_rules! singleton_key {
     ($ty:ty) => {
-        impl Key for $ty {
-            type MapStorage<V> = SingletonMapStorage<V>;
+        impl<'a, V: 'a> Key<'a, V> for $ty {
+            type MapStorage = SingletonMapStorage<V>;
             type SetStorage = SingletonSetStorage;
         }
     };

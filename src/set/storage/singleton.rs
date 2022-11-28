@@ -9,11 +9,11 @@ pub struct SingletonSetStorage {
     is_set: bool,
 }
 
-impl<T> SetStorage<T> for SingletonSetStorage
+impl<T> SetStorage<'_, T> for SingletonSetStorage
 where
     T: Default,
 {
-    type Iter<'this> = ::core::option::IntoIter<T>;
+    type Iter = ::core::option::IntoIter<T>;
     type IntoIter = ::core::option::IntoIter<T>;
 
     #[inline]
@@ -60,7 +60,7 @@ where
     }
 
     #[inline]
-    fn iter(&self) -> Self::Iter<'_> {
+    fn iter(&self) -> Self::Iter {
         self.is_set.then_some(T::default()).into_iter()
     }
 
